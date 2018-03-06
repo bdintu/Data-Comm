@@ -7,7 +7,7 @@
 /**
 										Type 0 : Data
 		0			1			2		3			4			5				11		12
-	[ START_BIT | START_BIT | TYPE | frame_index | DATA[0] | DATA[1] | ... | DATA[7] | STOPBIT ]
+	[ START_BIT | START_BIT | TYPE | frame_id | DATA[0] | DATA[1] | ... | DATA[7] | STOPBIT ]
 		0			0			0		1			H			e		...		1		1
 									(send frame 1 : Hell ... \n)
 									( frame size : 11 byte )
@@ -15,7 +15,7 @@
 
 							Type 1 : ACK
 		0		1				2		3			4
-	[ START_BIT | START_BIT | TYPE | frame_index | STOPBIT ]
+	[ START_BIT | START_BIT | TYPE | frame_id | STOPBIT ]
 		0			0			6		0			1
 							( ack0)
 					( frame sisze = 4 byte )
@@ -42,15 +42,15 @@
 #define FRAME_STOPBIT_INDEX		12
 #define FRAME_STOPBIT_DATA		1
 
-//#include <conio.h>
-//#include <dos.h>
+#include <conio.h>
+#include <dos.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 typedef struct {
 	char type;
-	char frame_i;
+	char frame_id;
 	char data[FRAME_DATA_SIZE];
 } frame;
 
@@ -78,7 +78,7 @@ int main(void) {
 	ch = getch();
 
     if (ch == 's') {
-        printf("Send file : ");
+        printf("s\nSend file : ");
         gets(fdir);
         fp = fopen(fdir, "r");
         if (!fp) {
@@ -86,16 +86,19 @@ int main(void) {
             return -1;
         }
 
-		outword.frame_i = 0;
+		outword.type = FRAME_TYPE_DATA;
+		outword.frame_id = 0;
         while (1) {
 			// mode = 1, read next word to buffer
             if (mode == 1) {
-				if (readFile(fp, &outword) == -1)
-					return 0;
-				outword.type = FRAME_TYPE_DATA;
+				if (readFile(fp, &outword) == -1) {
+					send_frame(&outword);
+					printf("EOF\n");
+					break;
+				}
             }
 
-            printf("\nSend frame : %d\n", outword.frame_i);
+            printf("\nSend frame : %d\n", outword.frame_id);
             printf("Data		: [");
 			print_data(&outword);
             printf("]\n");
@@ -108,28 +111,29 @@ int main(void) {
 			ch = getch();
 			if (ch == 't') {
 				mode = 0;
-				printf("t\nRetransmit frame %d\n", outword.frame_i);
+				printf("t\nRetransmit frame %d\n", outword.frame_id);
 				continue;
 			}
 
 			// check ack
             if (inword.type == FRAME_TYPE_ACK) {
 				mode = 1;
-				outword.frame_i ^= 1;
-				printf("\nReceive ACK%d\n", inword.frame_i);
+				outword.frame_id ^= 1;
+				printf("\nReceive ACK%d\n", inword.frame_id);
 			}
         }
-		
+
 		// dicconnect
 		outword.type = FRAME_TYPE_END;
-		outword.frame_i ^= 1;
+		outword.frame_id ^= 1;
+		fill_data(&outword, 0);
 		send_frame(&outword);
 
         fclose(fp);
     }
 
     if (ch == 'r') {
-        printf("Sender Send : ");
+        printf("r\nSender Send : ");
         gets(fdir);
         fp = fopen(fdir, "w+");
         if (!fp) {
@@ -138,46 +142,49 @@ int main(void) {
         }
 
 		outword.type = FRAME_TYPE_ACK;
-		outword.frame_i = 0;
+		outword.frame_id = 0;
+		fill_data(&outword, 0);
         while (1) {
 			get_frame(&inword);
 			if (inword.type == FRAME_TYPE_END)
 				break;
 
-			printf("\nReceive frame : %d\n", inword.frame_i);
+			printf("\nReceive frame : %d\n", inword.frame_id);
 			printf("Data          : [");
 			print_data(&inword);
 			printf("]\n");
 			printf("Action frame  : ");
 
-			ch = getchar();
+			do {
+				ch = getch();
+			} while(ch != 'a' || ch != 'n' || ch != 'r');
+
 			switch (ch) {
 				case 'a' :
-					if (outword.frame_i == inword.frame_i) {
+					if (outword.frame_id == inword.frame_id) {
+						outword.frame_id ^= 1;						
 						fputs(inword.data, fp);
-						outword.frame_i ^= 1;
-		                printf("Received & Send ACK%d\n", outword.frame_i);
+		                printf("a\nReceived & Send ACK%d\n", outword.frame_id);
 					} else {
-						printf("Reject & Send ACK%d\n", outword.frame_i);
+						printf("a\nReject & Send ACK%d\n", outword.frame_id);
 					}
 				break;
 
 				case 'n' :
-					if (outword.frame_i == inword.frame_i) {
-						outword.frame_i ^= 1;
+					if (outword.frame_id == inword.frame_id) {
+						outword.frame_id ^= 1;
 						fputs(inword.data, fp);
-						printf("Received & Sleep\n");
+						printf("n\nReceived & Sleep\n");
 					} else {
-						printf("Reject & Sleep\n");
+						printf("n\nReject & Sleep\n");
 					}
 				break;
 
 				case 'r' :
-					printf("Reject & Sleep\n");
+					printf("r\nReject & Sleep\n");
 				break;
 			}
 		}
-
 		fclose(fp);
 	}
 
@@ -195,8 +202,8 @@ void setup_serial(void) {
 	/* Bit pattern loads is 00001010b, from MSB to LSB these are: */
 	/* 0  - access TD/RD buffer, 0 - normal output */
 	/* 0  - no stick bit, 0 - even parity */
-	/* 1  - parity on, 0 – 1 stop bit */
-	/* 10 – 7 data bits */
+	/* 1  - parity on, 0 ï¿½ 1 stop bit */
+	/* 10 ï¿½ 7 data bits */
 }
 
 void send_character(char ch) {
@@ -221,41 +228,25 @@ void send_frame(frame* buffer) {
 	send_character(FRAME_STARTBIT_DATA);
 	send_character(FRAME_STARTBIT_DATA);
 	send_character(buffer->type);
-	send_character(buffer->frame_i);
+	send_character(buffer->frame_id);
 	int i;
 	for (i = 0; i < FRAME_DATA_SIZE; ++i) {
-		send_character(buffer->data[0]);
+		send_character(buffer->data[i]);
 	}
 	send_character(FRAME_STOPBIT_DATA);
 }
 
 void get_frame(frame* buffer) {
-	int i = 0;
+	int i;
 	char tmp;
-
-	// detect start bit
-	do {
-		tmp = get_character();
-		if (tmp == FRAME_STARTBIT_DATA) {
-			++i;
-		} else {
-			i = 0;
-			fprintf(stderr, "startbit detect error");
-		}
-	} while(i == FRAME_STARTBIT_SIZE);
-
-	// read to buffer
+	tmp = get_character();
+	tmp = get_character();
 	buffer->type = get_character();
-	buffer->frame_i = get_character();
-	for (i = FRAME_DATA_BEGIN; i <= FRAME_DATA_END; ++i) {
+	buffer->frame_id = get_character();
+	for (i = 0; i < FRAME_DATA_SIZE; ++i) {
 		buffer->data[i] = get_character();
 	}
-
-	// detect stopbit
 	tmp = get_character();
-	if (tmp != FRAME_STOPBIT_DATA) {
-		fprintf(stderr, "stopbit detect error");
-	}
 }
 
 int readFile(FILE* fp, frame* buffer) {
@@ -268,7 +259,6 @@ int readFile(FILE* fp, frame* buffer) {
 			return -1;
 		}
 	}
-	//fill_data(buffer, i);
 	printf(">>readFile: {i:%d}",i);
 	return 0;
 }
