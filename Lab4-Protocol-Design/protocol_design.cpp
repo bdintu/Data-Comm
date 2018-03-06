@@ -157,7 +157,7 @@ int main(void) {
 
 			do {
 				ch = getch();
-			} while(ch != 'a' || ch != 'n' || ch != 'r');
+			} while(ch == '\n');
 
 			switch (ch) {
 				case 'a' :
@@ -185,9 +185,11 @@ int main(void) {
 				break;
 			}
 		}
+
 		fclose(fp);
 	}
 
+	getch();
 	return 0;
 }
 
