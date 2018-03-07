@@ -5,47 +5,47 @@
 #define LSR			(COM3BASE + 5)	// 0x3FD line status
 
 /**
-										Type 0 : Data
-		0			1			2		3			4			5				11		12
-	[ START_BIT | START_BIT | TYPE | frame_id | DATA[0] | DATA[1] | ... | DATA[7] | STOPBIT ]
-		0			0			0		1			H			e		...		1		1
-									(send frame 1 : Hell ... \n)
-									( frame size : 11 byte )
+						Type 1 : Data
+		0		1			2		3				9		10
+	[ TYPE | FRAME_ID | DATA[0] | DATA[1] | ... | DATA[7] | FLAG ]
+		1		0			H		e		...		1		0
+					(send frame 1 : Hell ... \n)
+					( frame size : 11 byte )
 
+			Type 4 : END
+		0		1		2
+	[ TYPE | FRAME_ID | FLAG ]
+		4		0		0
+			( ack0)
+	( frame sisze = 3 byte )
 
-							Type 1 : ACK
-		0		1				2		3			4
-	[ START_BIT | START_BIT | TYPE | frame_id | STOPBIT ]
-		0			0			6		0			1
-							( ack0)
-					( frame sisze = 4 byte )
+			Type 6 : ACK
+		0		1		2
+	[ TYPE | FRAME_ID | FLAG ]
+		6		1		0
+			( ack0)
+	( frame sisze = 3 byte )
 */
 
-#define FRAME_SIZE				13
+#define FRAME_SIZE				11
 
-#define FRAME_STARTBIT_DATA		0
-#define FRAME_STARTBIT_BEGIN	0
-#define FRAME_STARTBIT_SIZE		2
-#define FRAME_STARTBIT_END		(FRAME_STARTBIT_BEGIN + FRAME_STARTBIT_SIZE -1)
-
-#define	FRAME_TYPE_INDEX		2
+#define	FRAME_TYPE_INDEX		0
 #define FRAME_TYPE_DATA			1
 #define FRAME_TYPE_END			4
 #define FRAME_TYPE_ACK			6
 
-#define FRAME_ID_INDEX			3
+#define FRAME_ID_INDEX			1
 
-#define	FRAME_DATA_BEGIN		4
+#define	FRAME_DATA_BEGIN		2
 #define FRAME_DATA_SIZE			8
 #define FRAME_DATA_END			(FRAME_DATA_BEGIN + FRAME_DATA_SIZE -1)
 
-#define FRAME_STOPBIT_INDEX		12
-#define FRAME_STOPBIT_DATA		1
+#define FRAME_FLAG_INDEX		10
+#define FRAME_FLAG_DATA			0
 
 #include <conio.h>
 #include <dos.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 typedef struct {
@@ -83,6 +83,7 @@ int main(void) {
         fp = fopen(fdir, "r");
         if (!fp) {
             printf("can't open file dir %s\n", fdir);
+			getch();
             return -1;
         }
 
@@ -105,25 +106,27 @@ int main(void) {
             printf("Timeout		: ");
 
             send_frame(&outword);
-			get_frame(&inword);
-
+			
 			// timeout
 			ch = getch();
 			if (ch == 't') {
+			printf("\n\t>> pass true if ch == t");
 				mode = 0;
 				printf("t\nRetransmit frame %d\n", outword.frame_id);
 				continue;
 			}
 
+			get_frame(&inword);
 			// check ack
             if (inword.type == FRAME_TYPE_ACK) {
+			printf("\n\t>> pass check ack");
 				mode = 1;
 				outword.frame_id ^= 1;
 				printf("\nReceive ACK%d\n", inword.frame_id);
 			}
         }
 
-		// dicconnect
+		// disconnect
 		outword.type = FRAME_TYPE_END;
 		outword.frame_id ^= 1;
 		fill_data(&outword, 0);
@@ -138,6 +141,7 @@ int main(void) {
         fp = fopen(fdir, "w+");
         if (!fp) {
             printf("can't write file dir %s\n", fdir);
+			getch();
             return -1;
         }
 
@@ -146,6 +150,8 @@ int main(void) {
 		fill_data(&outword, 0);
         while (1) {
 			get_frame(&inword);
+
+			// disconnect
 			if (inword.type == FRAME_TYPE_END)
 				break;
 
@@ -168,6 +174,7 @@ int main(void) {
 					} else {
 						printf("a\nReject & Send ACK%d\n", outword.frame_id);
 					}
+					send_frame(&outword);
 				break;
 
 				case 'n' :
@@ -198,9 +205,8 @@ void setup_serial(void) {
 	/*set up bit 7 to a 1 to set Register address bit*/
 	outportb(TXDATA, 0x0C);
 	outportb(TXDATA + 1, 0X00);
-	outportb(LCR, 0xA);
-	/*load TxRegister with 12, crystal frequency is 1.8432 MHz*/ outportb(LCR,
-			0x0A);
+	outportb(LCR, 0x0A);
+	/*load TxRegister with 12, crystal frequency is 1.8432 MHz*/
 	/* Bit pattern loads is 00001010b, from MSB to LSB these are: */
 	/* 0  - access TD/RD buffer, 0 - normal output */
 	/* 0  - no stick bit, 0 - even parity */
@@ -227,28 +233,23 @@ int get_character(void) {
 }
 
 void send_frame(frame* buffer) {
-	send_character(FRAME_STARTBIT_DATA);
-	send_character(FRAME_STARTBIT_DATA);
 	send_character(buffer->type);
 	send_character(buffer->frame_id);
 	int i;
 	for (i = 0; i < FRAME_DATA_SIZE; ++i) {
 		send_character(buffer->data[i]);
 	}
-	send_character(FRAME_STOPBIT_DATA);
+	send_character(FRAME_FLAG_DATA);
 }
 
 void get_frame(frame* buffer) {
-	int i;
-	char tmp;
-	tmp = get_character();
-	tmp = get_character();
 	buffer->type = get_character();
 	buffer->frame_id = get_character();
+	int i;
 	for (i = 0; i < FRAME_DATA_SIZE; ++i) {
 		buffer->data[i] = get_character();
 	}
-	tmp = get_character();
+	get_character();
 }
 
 int readFile(FILE* fp, frame* buffer) {
