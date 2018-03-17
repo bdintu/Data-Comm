@@ -5,29 +5,29 @@
 #define LSR			(COM3BASE + 5)	// 0x3FD line status
 
 /**
-						Type 1 : Data
-		0		1			2		3				9		10
-	[ TYPE | FRAME_ID | DATA[0] | DATA[1] | ... | DATA[7] | FLAG ]
-		1		0			H		e		...		1		0
+	Type 1 : Data
+		0		1			2		3				9
+	[ TYPE | FRAME_ID | DATA[0] | DATA[1] | ... | DATA[7] ]
+		1		0			H		e		...		\n
 					(send frame 1 : Hell ... \n)
-					( frame size : 11 byte )
+					( frame size : 10 byte )
 
-			Type 4 : END
-		0		1		2
-	[ TYPE | FRAME_ID | FLAG ]
-		4		0		0
-			( ack0)
-	( frame sisze = 3 byte )
+	Type 4 : END
+		0		1
+	[ TYPE | FRAME_ID ]
+		4		0
+		(disconnect)
+	( frame size = 2 byte )
 
-			Type 6 : ACK
-		0		1		2
-	[ TYPE | FRAME_ID | FLAG ]
-		6		1		0
-			( ack0)
-	( frame sisze = 3 byte )
+	Type 6 : ACK
+		0		1
+	[ TYPE | FRAME_ID ]
+		6		0
+		(ack0)
+	( frame size = 2 byte )
 */
 
-#define FRAME_SIZE				11
+#define FRAME_SIZE				10
 
 #define	FRAME_TYPE_INDEX		0
 #define FRAME_TYPE_DATA			1
@@ -39,9 +39,6 @@
 #define	FRAME_DATA_BEGIN		2
 #define FRAME_DATA_SIZE			8
 #define FRAME_DATA_END			(FRAME_DATA_BEGIN + FRAME_DATA_SIZE -1)
-
-#define FRAME_FLAG_INDEX		10
-#define FRAME_FLAG_DATA			0
 
 #include <conio.h>
 #include <dos.h>
@@ -75,10 +72,10 @@ int main(void) {
     setup_serial();
 
     printf("Send or Receive ('s' or 'r') : ");
-	ch = getch();
+	scanf("%c", ch);
 
     if (ch == 's') {
-        printf("s\nSend file : ");
+        printf("\nSend file : ");
         gets(fdir);
         fp = fopen(fdir, "r");
         if (!fp) {
@@ -108,18 +105,17 @@ int main(void) {
             send_frame(&outword);
 			
 			// timeout
-			ch = getch();
+			scanf("%c", ch);
+
 			if (ch == 't') {
-			printf("\n\t>> pass true if ch == t");
 				mode = 0;
-				printf("t\nRetransmit frame %d\n", outword.frame_id);
+				printf("\nRetransmit frame %d\n", outword.frame_id);
 				continue;
 			}
 
 			get_frame(&inword);
 			// check ack
             if (inword.type == FRAME_TYPE_ACK) {
-			printf("\n\t>> pass check ack");
 				mode = 1;
 				outword.frame_id ^= 1;
 				printf("\nReceive ACK%d\n", inword.frame_id);
@@ -136,8 +132,10 @@ int main(void) {
     }
 
     if (ch == 'r') {
-        printf("r\nSender Send : ");
+        printf("\nSender Send : ");
         gets(fdir);
+		printf("\nSave as : ");
+		gets(fdir);
         fp = fopen(fdir, "w+");
         if (!fp) {
             printf("can't write file dir %s\n", fdir);
@@ -162,7 +160,7 @@ int main(void) {
 			printf("Action frame  : ");
 
 			do {
-				ch = getch();
+				scanf("%c", ch);
 			} while(ch == '\n');
 
 			switch (ch) {
@@ -170,9 +168,9 @@ int main(void) {
 					if (outword.frame_id == inword.frame_id) {
 						outword.frame_id ^= 1;						
 						fputs(inword.data, fp);
-		                printf("a\nReceived & Send ACK%d\n", outword.frame_id);
+		                printf("\nReceived & Send ACK%d\n", outword.frame_id);
 					} else {
-						printf("a\nReject & Send ACK%d\n", outword.frame_id);
+						printf("\nReject & Send ACK%d\n", outword.frame_id);
 					}
 					send_frame(&outword);
 				break;
@@ -181,14 +179,14 @@ int main(void) {
 					if (outword.frame_id == inword.frame_id) {
 						outword.frame_id ^= 1;
 						fputs(inword.data, fp);
-						printf("n\nReceived & Sleep\n");
+						printf("\nReceived & Sleep\n");
 					} else {
-						printf("n\nReject & Sleep\n");
+						printf("\nReject & Sleep\n");
 					}
 				break;
 
 				case 'r' :
-					printf("r\nReject & Sleep\n");
+					printf("\nReject & Sleep\n");
 				break;
 			}
 		}
@@ -210,8 +208,8 @@ void setup_serial(void) {
 	/* Bit pattern loads is 00001010b, from MSB to LSB these are: */
 	/* 0  - access TD/RD buffer, 0 - normal output */
 	/* 0  - no stick bit, 0 - even parity */
-	/* 1  - parity on, 0 � 1 stop bit */
-	/* 10 � 7 data bits */
+	/* 1  - parity on, 0 ? 1 stop bit */
+	/* 10 ? 7 data bits */
 }
 
 void send_character(char ch) {
@@ -239,7 +237,6 @@ void send_frame(frame* buffer) {
 	for (i = 0; i < FRAME_DATA_SIZE; ++i) {
 		send_character(buffer->data[i]);
 	}
-	send_character(FRAME_FLAG_DATA);
 }
 
 void get_frame(frame* buffer) {
@@ -249,7 +246,6 @@ void get_frame(frame* buffer) {
 	for (i = 0; i < FRAME_DATA_SIZE; ++i) {
 		buffer->data[i] = get_character();
 	}
-	get_character();
 }
 
 int readFile(FILE* fp, frame* buffer) {
@@ -262,7 +258,6 @@ int readFile(FILE* fp, frame* buffer) {
 			return -1;
 		}
 	}
-	printf(">>readFile: {i:%d}",i);
 	return 0;
 }
 
