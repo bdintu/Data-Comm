@@ -8,17 +8,17 @@ uint16_t pwmDuty[N];
 void setup() {
   Serial.begin(115200);
   pinMode(PWM_PIN, OUTPUT);
-  for(int i=0; i<4; ++i) {
-    zeta[i] = i*(360/N);
-    S[i] = sin((PI/2)*(zeta[i]/360));
-    pwmDuty[i] = S[i]*255;
-    sprintf(str, "zeta:%6.3f, sin:%6.3f, pwmDuty:%6.3f", zeta[i], S[i], pwmDuty[i]);
+  for (int i = 0; i < N; ++i) {
+    zeta[i] = i * (360 / N);
+    S[i] = sin(zeta[i] * (M_PI / 180));
+    pwmDuty[i] = ((S[i] + 1) / 2) * 255;
+    sprintf(str, "zeta:%6s, sin:%5s, pwmDuty:%3d", String(zeta[i]).c_str(), String(S[i]).c_str(), pwmDuty[i]);
     Serial.println(str);
   }
-}; 
+}
 
 void loop() {
-  for(int i=0; i<4; ++i) {
+  for (int i = 0; i < N; ++i) {
     analogWrite(PWM_PIN, pwmDuty[i]);
     delayMicroseconds(400);
   }
