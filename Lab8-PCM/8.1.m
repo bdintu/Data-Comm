@@ -1,9 +1,15 @@
-%download link https://goo.gl/XhKvsx
-filename = 'MAGNIFICAT_16bits_96kHz.flac';
+%(26M) https://drive.google.com/open?id=1qdgl0qNxkdzr4n9GpSP5r9st_bNyvESF
+filename = 'stereo-88k-24b.flac';
+
+%(204M) https://drive.google.com/open?id=1k6Ucql79cOoexC1bcYLdOudxFQ4OCwSd
+%filename = 'MAGNIFICAT_16bits_96kHz.flac';
+
 [y, Fs] = audioread(filename);
 nBits=24;
-playerObj = audioplayer(y(:, 1), Fs, nBits);
+channal = 1;
+playerObj = audioplayer(y(:, channal), Fs, nBits);
 get(playerObj);
 play(playerObj);
-%plot(y(:, 1));
+plot(y(:, channal));
+
 %stop(playerObj);
