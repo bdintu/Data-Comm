@@ -3,8 +3,6 @@
 
 #define defaultFreq 1700
 #define freq0 500
-#define SDA_PIN A4
-#define SCL_PIN A5
 #define N_BIT 4
 
 Adafruit_MCP4725 dac;
@@ -15,12 +13,10 @@ float S[N_BIT];
 uint16_t S_DAC[N_BIT];
 
 void setup() {
-  pinMode(SDA_PIN, OUTPUT);
-  pinMode(SCL_PIN, OUTPUT);
 
   Serial.begin(115200);
-  dac.begin(0x62);
-  delay0 = (1000000 / freq0 - 1000000 / defaultFreq) / 4;
+  dac.begin(0x64);
+  delay0 = (1000000 / freq0 - 1000000 / defaultFreq) / N_BIT;
   sprintf(str, "delay0:", delay0);
   Serial.println(str);
 
