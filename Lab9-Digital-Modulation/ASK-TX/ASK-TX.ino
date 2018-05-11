@@ -3,7 +3,7 @@
 
 #define defaultFreq 1700            /* DAC Speed */
 #define freq0 1000                  /* frequency of carrier sine wave (Hz) */
-#define N_DATA 1                    /* Number of Data */
+#define N 1                         /* Number of Data (byte) */
 
 Adafruit_MCP4725 dac;
 const float A[4] = {1 ,2 , 3, 4};   /* ASK Amplitude (0, 5] (V) */
