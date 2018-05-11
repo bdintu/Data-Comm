@@ -1,22 +1,22 @@
 #include <Wire.h>
 #include <Adafruit_MCP4725.h>
 
-#define defaultFreq 1700
-#define freq0 500
+#define defaultFreq 1700    /* DAC Speed */
+#define freq0 1000          /* frequency of carrier sine wave (Hz) */
 
-#define a0min
-#define a0max
-#define a1min
-#define a1max
-#define a2min
-#define a2max
-#define a3min
-#define a3max
+#define r_slope 102 -1      /* amplitude difference for detecting rising or falling */
 
-#define r_slope
+#define a0min 108           /* a0min <= a0 <= a0max */
+#define a0max 220 +1
+#define a1min a0max -1      /* a1min <= a1 <= a1max */
+#define a1max 444 +1
+#define a2min a1max -1      /* a2min <= a2 <= a2max */
+#define a2max 669 +1
+#define a3min a2max -1      /* a3min <= a3 <= a3max */
+#define a3max 889 +1
 
 Adafruit_MCP4725 dac;
-const float A[4] = {0, _, _, _};
+const float A[4] = {1, 2, 3, 4};
 int delay0;
 int sum = 0;
 int max = 0;
@@ -40,11 +40,11 @@ void loop() {
         check = true;
     }
 
-    if (tmp > max) {
+    if (tmp > max) {            /* update max value */
         max = tmp;
     }
 
-    if (max-tmp > rslop) {
+    if (max-tmp > rslop) {      /* check for falling signal */
         if (check) {
             
             if (a0min<max && max<a0max) {
@@ -62,8 +62,8 @@ void loop() {
             }
 
             if (count == 5) {
-                Serial.println();
                 count = 0;
+                Serial.println();
             }
         }
 
